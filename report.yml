@@ -1,0 +1,70 @@
+---
+- hosts: localhost
+  vars_files:
+    - /home/ansible/keys.yml
+  tasks:
+    - name: Gather VPC information
+      ec2_vpc_net_info:
+        access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+      register: aws_vpcs
+
+    - name: Debug AWS VPCs
+      debug:
+        var: aws_vpcs.vpcs[0].vpc_id
+
+    - name: write vpc id to report vars_files
+      lineinfile:
+        line: "VPC ID: {{ aws_vpcs.vpcs[0].vpc_id }}"
+        path: /home/ansible/report.txt
+
+
+    - name: gathe subnet facts 
+      ec2_vpc_subnet_facts:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        filters:
+          vpc-id: "{{ aws_vpcs.vpcs[0].vpc_id }}"  
+      register: aws_subnet     
+
+    - name: Debug AWS Subnets
+      debug:
+        var: aws_subnet 
+
+    - name: write subnet id to report vars_files
+      lineinfile:
+        line: "Subnet ID: {{ aws_subnet.subnets[0].subnet_id }}"
+        path: /home/ansible/report.txt  
+
+    - name: gather facts about ec2 with name Leo
+      ec2_instance_info:
+        access_key: "{{ AWS_ACCESS_KEY_ID }}"    
+        secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        filters:
+          "tag:Name": Leo
+      register: leo_instance  
+
+    - name: Debug EC2 instances Leo
+      debug:
+        var: leo_instance.instances[0].network_interfaces[0].groups[0].group_id  
+
+    - name: Gather facts about security group with tag Name Leo
+      ec2_group_info:
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION }}"
+        filters:
+          group_id: "{{ leo_instance.instances[0].network_interfaces[0].groups[0].group_id }}"
+      register: sg_facts
+
+    - name: Debug sg valus
+      debug:
+        var: sg_facts
+
+    - name: write sg rules to file
+      lineinfile:
+        line: "Security Group Rule Set: {{ sg_facts.security_groups[0].ip_permissions }}"
+        path: /home/ansible/report.txt                
