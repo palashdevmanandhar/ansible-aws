@@ -1,0 +1,44 @@
+---
+-  hosts: node1
+   become: yes
+   tasks:
+   -  name: update yum packages
+      yum:
+        name: "*"
+        state: latest
+   -  name: Insert Image updated date
+      lineinfile:
+        path: /home/ansible/image.txt
+        line: "Image updated {{ ansible_date_time.date }}"   
+   - name: Gather facts
+     ec2_metadata_facts:    
+
+-  hosts: localhost
+   become: yes
+   vars_files:
+   - /home/ansible/keys.yml
+   tasks:
+   -  name: stop ec2 instance node1 in ansible hosts 
+      ec2:
+        region: "{{ AWS_REGION  }}"  
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        state: stopped
+        instance_id: "{{ hostvars['node1'].ansible_ec2_instance_id }}"
+        wait: yes
+
+   -  name: Create new AMI based on node1
+      ec2_ami:
+        name: UpdatedImage
+        instance_id: "{{ hostvars['node1'].ansible_ec2_instance_id }}" 
+        state: present
+        region: "{{ AWS_REGION  }}"  
+        access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+      register: ami_output
+
+   -  name: write ami info to file 
+      lineinfile:  
+        create: yes
+        path: /home/ansible/ami.txt
+        line: "{{ ami_output.image_id }}"   
