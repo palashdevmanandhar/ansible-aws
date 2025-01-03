@@ -1,0 +1,15 @@
+---
+-  hosts: localhost
+   gather_facts: yes
+   vars_files:
+   - /home/ansible/keys/aws-access.yml
+   tasks:
+   - name: Change state of ec2
+     ec2:
+       aws_access_key: "{{ ACCESS_ID }}"
+       aws_secret_key: "{{ SECRET_ID }}"
+       region: "{{ REGION }}"
+       state: stopped
+       instance_tags:
+         Name: node1 
+         
