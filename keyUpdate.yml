@@ -1,0 +1,56 @@
+---
+-  hosts: localhost
+   gather_facts: no
+   become: no
+   vars_files:
+     -  /home/ansible/keys.yml
+   tasks:
+    - name: Get IAM user details
+      iam:
+        iam_type: user
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION}}"
+        name: testuser
+        state: present
+      register: testuser_facts
+
+    - name: View user details
+      debug:
+        var: testuser_facts 
+
+    - name: remove access keys 
+      iam:
+        iam_type: user
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION}}"
+        name: testuser         
+        access_key_ids: "{{ testuser_facts.user_meta.access_keys[0].access_key_id }}"
+        access_key_state: remove
+        state: update
+
+    - name: create new access key for test user
+      iam:
+        iam_type: user
+        aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+        aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+        region: "{{ AWS_REGION}}"
+        name: testuser         
+        access_key_state: create
+        state: update 
+      register: user_facts
+
+    - name: write access key id info to file 
+      lineinfile:
+        path: /home/ansible/newkey.txt
+        line: "{{ user_facts.created_keys[0].access_key_id }}"
+        create: true
+
+    - name: write secret key  info to file 
+      lineinfile:
+        path: /home/ansible/newkey.txt
+        line: "{{ user_facts.created_keys[0].secret_access_key }}"
+        create: true    
+
+   
