@@ -1,0 +1,29 @@
+---
+-  hosts: localhost
+   gather_facts: yes
+   become: yes
+   vars_files:
+   - /home/ansible/keys.yml
+   tasks:
+   - name: stop Leo ec2 instance 
+     ec2:
+       aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+       aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+       region: "{{ AWS_REGION }}"
+       state: stopped
+       instance_tags:
+         Name: Leo
+
+   - name: deploy new ec2 instance
+     ec2:
+       aws_access_key: "{{ AWS_ACCESS_KEY_ID }}"
+       aws_secret_key: "{{ AWS_SECRET_ACCESS_KEY }}"
+       region: "{{ AWS_REGION }}"
+       state: present
+       instance_type: t2.micro
+       image: ami-039c609a82e0dd97c
+       wait: true
+       vpc_subnet_id: subnet-01b0ce3ce6873e783
+       assign_public_ip: yes
+       instance_tags:
+         Name: New     
