@@ -36,24 +36,6 @@
         state: present 
         wait: yes
 
-    - name: create an ec2 instance ansible-node
-      ec2_instance:        
-        access_key: "{{ ACCESS_ID }}"
-        secret_key: "{{ SECRET_ID }}"  
-        image_id: "{{ ec2_image_id }}"
-        instance_type: "{{ instance_small }}"
-        region: "{{ REGION }}"
-        name: node1
-        key_name: "{{ ec2_ssh_key_name }}"
-        security_group: "{{ sg_name }}"
-        network:
-          assign_public_ip: yes
-        state: present  
-        tags:
-          app: web
-        vpc_subnet_id: "{{ subnet_id }}"
-        wait: no
-
     - name: create an ec2 instance ansible-node2
       ec2_instance:        
         access_key: "{{ ACCESS_ID }}"
@@ -61,7 +43,7 @@
         image_id: "{{ ec2_image_id }}"
         instance_type: "{{ instance_small }}"
         region: "{{ REGION }}"
-        name: node2
+        name: node3
         key_name: "{{ ec2_ssh_key_name }}"
         security_group: "{{ sg_name }}"
         network:
@@ -70,7 +52,7 @@
         tags:
           app: web
         vpc_subnet_id: "{{ subnet_id }}"
-        wait: yes
+        wait: yes    
 
 
     - name: gather insances info
@@ -80,6 +62,7 @@
         region: "{{ REGION }}"
         filters:
           "tag:app": web
+          instance-state-name: ["running"]
       register: web_app_instances
 
     - name: extract public IP addresses of the instances
@@ -90,14 +73,42 @@
       debug:
         var: public_ips
 
-    - name: create a dynamic inventory file
-      copy:
-        dest: /home/ansible/new_inventory
-        content: |
-          [webservers]
-          {% for ip in public_ips %}
-          ec2-user@{{ ip }}
-          {% endfor %}
-        mode: '0644'
+    - name: create a dynamic host to inventory
+      add_host:
+        hostname: "ec2-user@{{ item }}"
+        groupname: webhosts
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+      loop: "{{ public_ips }}"
+
+-   hosts: webhosts
+    become: yes
+    tasks:
+
+    -   name: wait ssh connection
+        wait_for_connection:
+            delay: 5
+            timeout: 90
+
+    -   name: install httpd
+        dnf:
+            name: httpd
+            state: latest
+
+    -   name: install git
+        dnf:
+            name: git
+            state: latest
+    
+    -   name: git checkout the website
+        git:
+            dest: /var/www/html
+            repo: https://github.com/linuxacademy/content-introduction-to-ansible.git
+
+    -   name: Start Apache Service
+        service:
+            name: httpd
+            state: started
+            enabled: yes
+
 
                                
