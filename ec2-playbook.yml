@@ -1,0 +1,103 @@
+---
+- hosts: localhost
+  vars_files:
+    - /home/ansible/keys/aws-access.yml
+  become: yes  
+  vars:
+    ec2_image_id: ami-01816d07b1128cd2d
+    sg_name: httpd-server-sg
+    ec2_ssh_key_name: ansible-control-key
+    subnet_id: subnet-09e6eed71b90d7c13 
+    instance_small: t2.small  
+  tasks:
+    - name: create a sg for instances
+      ec2_group:
+        aws_access_key: "{{ ACCESS_ID }}"
+        aws_secret_key: "{{ SECRET_ID }}"
+        region: "{{ REGION }}"
+        name: "{{ sg_name }}"
+        description: sg for ansible nodes
+        state: present        
+        rules:
+          - proto: tcp
+            ports:
+              - 80
+              - 443
+              - 22
+            cidr_ip: 0.0.0.0/0
+
+    - name: create ssh key for instance based on the keys available at control
+      ec2_key:
+        aws_access_key: "{{ ACCESS_ID }}"
+        aws_secret_key: "{{ SECRET_ID }}"
+        region: "{{ REGION }}"
+        name: "{{ ec2_ssh_key_name }}"
+        key_material: "{{ lookup('file', '/home/ansible/.ssh/id_rsa.pub') }}"        
+        state: present 
+        wait: yes
+
+    - name: create an ec2 instance ansible-node
+      ec2_instance:        
+        access_key: "{{ ACCESS_ID }}"
+        secret_key: "{{ SECRET_ID }}"  
+        image_id: "{{ ec2_image_id }}"
+        instance_type: "{{ instance_small }}"
+        region: "{{ REGION }}"
+        name: node1
+        key_name: "{{ ec2_ssh_key_name }}"
+        security_group: "{{ sg_name }}"
+        network:
+          assign_public_ip: yes
+        state: present  
+        tags:
+          app: web
+        vpc_subnet_id: "{{ subnet_id }}"
+        wait: no
+
+    - name: create an ec2 instance ansible-node2
+      ec2_instance:        
+        access_key: "{{ ACCESS_ID }}"
+        secret_key: "{{ SECRET_ID }}"  
+        image_id: "{{ ec2_image_id }}"
+        instance_type: "{{ instance_small }}"
+        region: "{{ REGION }}"
+        name: node2
+        key_name: "{{ ec2_ssh_key_name }}"
+        security_group: "{{ sg_name }}"
+        network:
+          assign_public_ip: yes
+        state: present  
+        tags:
+          app: web
+        vpc_subnet_id: "{{ subnet_id }}"
+        wait: yes
+
+
+    - name: gather insances info
+      ec2_instance_info:
+        access_key: "{{ ACCESS_ID }}"
+        secret_key: "{{ SECRET_ID }}" 
+        region: "{{ REGION }}"
+        filters:
+          "tag:app": web
+      register: web_app_instances
+
+    - name: extract public IP addresses of the instances
+      set_fact:
+        public_ips: "{{ web_app_instances.instances | map(attribute='public_ip_address') | list }}"
+
+    - name: view public IP addresses
+      debug:
+        var: public_ips
+
+    - name: create a dynamic inventory file
+      copy:
+        dest: /home/ansible/new_inventory
+        content: |
+          [webservers]
+          {% for ip in public_ips %}
+          ec2-user@{{ ip }}
+          {% endfor %}
+        mode: '0644'
+
+                               

@@ -1,0 +1,33 @@
+---
+-   hosts: webservers
+    become: yes
+    tasks:
+
+    -   name: wait ssh connection
+        wait_for_connection:
+            delay: 5
+            timeout: 90
+
+    -   name: install httpd
+        dnf:
+            name: httpd
+            state: latest
+
+    -   name: install git
+        dnf:
+            name: git
+            state: latest
+    
+    -   name: git checkout the website
+        git:
+            dest: /var/www/html
+            repo: https://github.com/linuxacademy/content-introduction-to-ansible.git
+
+    -   name: Start Apache Service
+        service:
+            name: httpd
+            state: started
+            enabled: yes
+
+
+        
